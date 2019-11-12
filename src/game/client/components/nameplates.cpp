@@ -155,10 +155,16 @@ void CNamePlates::OnRender()
 	if(!g_Config.m_ClNameplates)
 		return;
 
+	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+	m_pClient->Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
+
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
 		// only render active characters
 		if(!m_pClient->m_Snap.m_aCharacters[i].m_Active)
+			continue;
+		// only render visible chararacters
+		if(!in_range(m_pClient->m_aClients[i].m_RenderPos.x, ScreenX0 - 32.f*6, ScreenX1 + 32.f*6) || !in_range(m_pClient->m_aClients[i].m_RenderPos.y, ScreenY0+32, ScreenY1+32.f*4))
 			continue;
 
 		const void *pInfo = Client()->SnapFindItem(IClient::SNAP_CURRENT, NETOBJTYPE_PLAYERINFO, i);

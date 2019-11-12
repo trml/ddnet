@@ -68,6 +68,13 @@ void CItems::RenderProjectile(const CNetObj_Projectile *pCurrent, int ItemID)
 	vec2 Pos = CalcPos(StartPos, StartVel, Curvature, Speed, Ct);
 	vec2 PrevPos = CalcPos(StartPos, StartVel, Curvature, Speed, Ct-0.001f);
 
+	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+	m_pClient->Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
+
+	// only render visible projectiles
+	if(!in_range(Pos.x, ScreenX0 - 64.f, ScreenX1 + 64.f) || !in_range(Pos.y, ScreenY0 - 64.f, ScreenY1 + 64.f))
+		return;
+
 	float Alpha = 1.f;
 	if(UseExtraInfo(pCurrent))
 	{
@@ -123,14 +130,22 @@ void CItems::RenderProjectile(const CNetObj_Projectile *pCurrent, int ItemID)
 
 void CItems::RenderPickup(const CNetObj_Pickup *pPrev, const CNetObj_Pickup *pCurrent, bool IsPredicted)
 {
+	float IntraTick = IsPredicted ? Client()->PredIntraGameTick() : Client()->IntraGameTick();
+	vec2 Pos = mix(vec2(pPrev->m_X, pPrev->m_Y), vec2(pCurrent->m_X, pCurrent->m_Y), IntraTick);
+
+	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+	m_pClient->Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
+
+	// only render visible pickups
+	if(!in_range(Pos.x, ScreenX0 - 64.f, ScreenX1 + 64.f) || !in_range(Pos.y, ScreenY0 - 64.f, ScreenY1 + 64.f))
+		return;
+
 	Graphics()->TextureSet(g_pData->m_aImages[IMAGE_GAME].m_Id);
 	Graphics()->QuadsSetRotation(0);
 	Graphics()->SetColor(1.f, 1.f, 1.f, 1.f);
 
 	int QuadOffset = 2;
 
-	float IntraTick = IsPredicted ? Client()->PredIntraGameTick() : Client()->IntraGameTick();
-	vec2 Pos = mix(vec2(pPrev->m_X, pPrev->m_Y), vec2(pCurrent->m_X, pCurrent->m_Y), IntraTick);
 	float Angle = 0.0f;
 	if(pCurrent->m_Type == POWERUP_WEAPON)
 	{
@@ -218,6 +233,14 @@ void CItems::RenderLaser(const struct CNetObj_Laser *pCurrent, bool IsPredicted)
 	vec2 Pos = vec2(pCurrent->m_X, pCurrent->m_Y);
 	vec2 From = vec2(pCurrent->m_FromX, pCurrent->m_FromY);
 	vec2 Dir = normalize(Pos-From);
+
+	// only render visible lasers
+	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+	m_pClient->Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
+	vec2 CenterPos = vec2(ScreenX0+ScreenX1, ScreenY0+ScreenY1)*0.5;
+	vec2 ClosestPos = closest_point_on_line(From, Pos, CenterPos);
+	if(distance(CenterPos, ClosestPos) > distance(CenterPos, vec2(ScreenX0, ScreenY0)) + 64.f)
+		return;
 
 	float Ticks;
 	if(IsPredicted)

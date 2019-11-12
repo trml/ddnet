@@ -636,6 +636,9 @@ void CPlayers::OnRender()
 		}
 	}
 
+	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+	m_pClient->Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
+
 	// render other players in two passes, first pass we render the other, second pass we render our self
 	for(int p = 0; p < 4; p++)
 	{
@@ -643,6 +646,9 @@ void CPlayers::OnRender()
 		{
 			// only render active characters
 			if(!m_pClient->m_Snap.m_aCharacters[i].m_Active)
+				continue;
+			// only render visible characters
+			if(!in_range(m_pClient->m_aClients[i].m_RenderPos.x, ScreenX0 - 64.f, ScreenX1 + 64.f) || !in_range(m_pClient->m_aClients[i].m_RenderPos.y, ScreenY0 - 64.f, ScreenY1 + 64.f))
 				continue;
 
 			const void *pPrevInfo = Client()->SnapFindItem(IClient::SNAP_PREV, NETOBJTYPE_PLAYERINFO, i);
