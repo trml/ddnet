@@ -189,6 +189,8 @@ if(NOT MSVC)
   check_c_compiler_flag("-O2;-Wp,-Werror;-D_FORTIFY_SOURCE=2" DEFINE_FORTIFY_SOURCE) # Some distributions define _FORTIFY_SOURCE by themselves.
 endif()
 
+add_c_compiler_flag_if_supported(OUR_FLAGS -pg)
+
 ########################################################################
 # COMMON FUNCTIONS
 ########################################################################
@@ -943,6 +945,7 @@ if(CLIENT)
     # Add pthreads (on non-Windows) at the end, so that other libraries can depend
     # on it.
     ${CMAKE_THREAD_LIBS_INIT}
+		"-pg"
   )
 
   if(TARGET_OS STREQUAL "windows")
