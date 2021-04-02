@@ -1683,6 +1683,22 @@ void CGameClient::OnNewSnapshot()
 
 void CGameClient::OnPredict()
 {
+	// update predicted inputs
+	const int NumInputs = sizeof(m_aClients[0].m_SnapInput) / sizeof(m_aClients[0].m_SnapInput[0]);
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(m_Snap.m_aCharacters[i].m_Active)
+		{
+			for(int Tick = Client()->GameTick(g_Config.m_ClDummy) + 1; Tick <= Client()->PredGameTick(g_Config.m_ClDummy); Tick++)
+			{
+				int t = Tick % NumInputs;
+				int t0 = (Tick + Client()->GameTick(g_Config.m_ClDummy) - Client()->PredGameTick(g_Config.m_ClDummy)) % NumInputs;
+				if(t >= 0 && t0 >= 0)
+					m_aClients[i].m_PredInput[t] = m_aClients[i].m_SnapInput[t0];
+			}
+		}
+	}
+
 	// store the previous values so we can detect prediction errors
 	CCharacterCore BeforePrevChar = m_PredictedPrevChar;
 	CCharacterCore BeforeChar = m_PredictedChar;
@@ -1765,10 +1781,27 @@ void CGameClient::OnPredict()
 		if(pDummyInputData && !DummyFirst)
 			pDummyChar->OnDirectInput(pDummyInputData);
 		m_PredictedWorld.m_GameTick = Tick;
+
+		// predict input of other players
+		if(!g_Config.m_ClAntiPingInput)
+			for(int i = 0; i < MAX_CLIENTS; i++)
+				if(CCharacter *pChar = m_PredictedWorld.GetCharacterByID(i))
+					if(pChar != pLocalChar && pChar != pDummyChar)
+					{
+						int t = Tick % NumInputs;
+						if(t >= 0)
+						{
+							CNetObj_PlayerInput Input = pChar->GetInput();
+							Input.m_Direction = m_aClients[i].m_PredInput[t].m_Direction;
+							pChar->OnPredictedInput(&Input);
+						}
+					}
+
 		if(pInputData)
 			pLocalChar->OnPredictedInput(pInputData);
 		if(pDummyInputData)
 			pDummyChar->OnPredictedInput(pDummyInputData);
+
 		m_PredictedWorld.Tick();
 
 		// fetch the current characters
@@ -2360,6 +2393,32 @@ void CGameClient::UpdatePrediction()
 			m_aLastWorldCharacters[i] = *pChar;
 			m_aLastWorldCharacters[i].DetachFromGameWorld();
 		}
+
+	// update snapped inputs
+	const int NumInputs = sizeof(m_aClients[0].m_SnapInput) / sizeof(m_aClients[0].m_SnapInput[0]);
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(m_Snap.m_aCharacters[i].m_Active)
+		{
+			for(int Tick = Client()->PrevGameTick(g_Config.m_ClDummy)+1; Tick <= Client()->GameTick(g_Config.m_ClDummy); Tick++)
+			{
+				int t = Tick % NumInputs;
+				if(t >= 0)
+				{
+					mem_zero(&m_aClients[i].m_SnapInput[t], sizeof(CNetObj_PlayerInput));
+					m_aClients[i].m_SnapInput[t].m_Direction = m_Snap.m_aCharacters[i].m_Cur.m_Direction;
+					m_aClients[i].m_SnapInput[t].m_Fire = m_Snap.m_aCharacters[i].m_Cur.m_AttackTick != m_Snap.m_aCharacters[i].m_Prev.m_AttackTick;
+
+					float Angle = m_Snap.m_aCharacters[i].m_Cur.m_Angle / 256.0f;
+					vec2 Direction = direction(Angle);
+					m_aClients[i].m_SnapInput[t].m_TargetX = round_to_int(Direction.x * 100.f);
+					m_aClients[i].m_SnapInput[t].m_TargetY = round_to_int(Direction.y * 100.f);
+
+					m_aClients[i].m_PredInput[t] = m_aClients[i].m_SnapInput[t];
+				}
+			}
+		}
+	}
 }
 
 void CGameClient::UpdateRenderedCharacters()

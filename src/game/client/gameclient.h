@@ -307,6 +307,10 @@ public:
 		int m_PredTick[200];
 		bool m_SpecCharPresent;
 		vec2 m_SpecChar;
+
+		CNetObj_PlayerInput m_SnapInput[200];
+		CNetObj_PlayerInput m_PredInput[200];
+		int m_InputDecisionTick;
 	};
 
 	CClientData m_aClients[MAX_CLIENTS];

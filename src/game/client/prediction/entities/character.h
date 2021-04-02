@@ -127,6 +127,8 @@ public:
 			m_Input.m_TargetY = m_LatestInput.m_TargetY = -1;
 		}
 	};
+	CNetObj_PlayerInput GetInput() { return m_Input; }
+
 	int GetJumped() { return m_Core.m_Jumped; }
 	int GetAttackTick() { return m_AttackTick; }
 	int GetStrongWeakID() { return m_StrongWeakID; }
