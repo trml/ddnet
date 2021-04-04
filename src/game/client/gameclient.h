@@ -308,9 +308,11 @@ public:
 		bool m_SpecCharPresent;
 		vec2 m_SpecChar;
 
-		CNetObj_PlayerInput m_SnapInput[200];
-		CNetObj_PlayerInput m_PredInput[200];
-		int m_InputDecisionTick;
+		CNetObj_PlayerInput m_SnapInput[1000];
+		CNetObj_PlayerInput m_PredInput[1000];
+		float m_PredDirLen;
+		float m_PredHookLen;
+		vec2 m_PredTarget;
 	};
 
 	CClientData m_aClients[MAX_CLIENTS];
