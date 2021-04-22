@@ -310,6 +310,14 @@ int CControls::SnapInput(int *pData)
 		if(!m_InputDirectionLeft[g_Config.m_ClDummy] && m_InputDirectionRight[g_Config.m_ClDummy])
 			m_InputData[g_Config.m_ClDummy].m_Direction = 1;
 
+		if(g_Config.m_ClTestInputPred > 0)
+		{
+			if((Client()->PredGameTick(g_Config.m_ClDummy) / g_Config.m_ClTestInputPred) % 2 == 0)
+				m_InputData[g_Config.m_ClDummy].m_Direction = -1;
+			else
+				m_InputData[g_Config.m_ClDummy].m_Direction = 1;
+		}
+
 		// dummy copy moves
 		if(g_Config.m_ClDummyCopyMoves)
 		{
