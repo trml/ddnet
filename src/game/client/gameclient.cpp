@@ -1697,144 +1697,165 @@ void CGameClient::OnPredict()
 				int LenMaxDir = LenMax;
 				int LenDir = -1;
 				bool WasMinimaDir = 0;
+				bool WasMaximaDir = 0;
+				bool FoundDir = 0;
 				float SumBestDir = -1.f;
 
 				int LenMaxHook = LenMax;
 				int LenHook = -1;
 				bool WasMinimaHook = 0;
+				bool WasMaximaHook = 0;
+				bool FoundHook = 0;
 				float SumBestHook = -1.f;
 
 				// find the best correlation with a previous input sequence
 				for(int LenCur = 1; LenCur <= LenMax; LenCur++)
 				{
-					for(int Offset = 0; Offset < 2; Offset++)
+					float SumDir = 0.f;
+					float SumHook = 0.f;
+					float SumWeight = 0.f;
+					float MatchPrevDir = 0.f;
+					float MatchPrevHook = 0.f;
+					for(int k = 0; k < minimum(LenMax, LenCur*2 + 5); k++)
 					{
-						float SumDir = 0.f;
-						float SumHook = 0.f;
-						float SumWeight = 0.f;
-						for(int k = 0; k < minimum(LenMax, LenCur*2 + 5); k++)
+						float Weight = powf(0.5, k/LenCur);
+						int Cur = (Client()->GameTick(g_Config.m_ClDummy) - k) % NumInputs;
+						int Prev = (Client()->GameTick(g_Config.m_ClDummy) - k - LenCur) % NumInputs;
+						if(Cur >= 0 && Prev >= 0)
 						{
-							float Weight = powf(0.5, k/LenCur);
-							int Cur = (Client()->GameTick(g_Config.m_ClDummy) - (k % LenCur)) % NumInputs;
-							int Prev = (Client()->GameTick(g_Config.m_ClDummy) - k - LenCur - Offset) % NumInputs;
-							if(Cur >= 0 && Prev >= 0)
+							float MatchDir = 1.f - (float) absolute(m_aClients[i].m_SnapInput[Cur].m_Direction - m_aClients[i].m_SnapInput[Prev].m_Direction);
+							float MatchHook = 1.f - 2.f * (float) absolute(m_aClients[i].m_SnapInput[Cur].m_Hook - m_aClients[i].m_SnapInput[Prev].m_Hook);
+							SumDir += Weight * MatchDir;
+							SumHook += Weight * MatchHook;
+							SumWeight += Weight;
+							if(k > 0)
 							{
-								MatchDir = Weight * (1.f - (float) absolute(m_aClients[i].m_SnapInput[Cur].m_Direction - m_aClients[i].m_SnapInput[Prev].m_Direction));
-								MatchHook = Weight * (1.f - 2.f * (float) absolute(m_aClients[i].m_SnapInput[Cur].m_Hook - m_aClients[i].m_SnapInput[Prev].m_Hook));
-								SumDir += MatchDir;
-								SumHook += MatchHook;
-								SumWeight += Weight;
+								SumDir += 0.5f * Weight * absolute(MatchDir - MatchPrevDir);
+								SumHook += 0.5f * Weight * absolute(MatchHook - MatchPrevHook);
 							}
-							else
-							{
-								SumDir = -1.f;
-								SumHook = -1.f;
-								break;
-							}
-						}
-						if(LenCur <= LenMaxDir)
-						{
-							SumDir = SumDir / (SumWeight + 0.01f);
-							if(SumDir < 0.5f)
-								WasMinimaDir = 1;
 
-							if(WasMinimaDir && SumDir > 0.6f && SumDir > SumBestDir)
-							{
-								SumBestDir = SumDir;
-								LenDir = LenCur;
-								//LenMaxDir = minimum(LenMaxDir, (int) (LenCur * 1.5));
-							}
+							MatchPrevDir = MatchDir;
+							MatchPrevHook = MatchHook;
 						}
-						if(LenCur <= LenMaxHook)
-						{
-							SumHook = SumHook / (SumWeight + 0.01f);
-							if(SumHook < 0.5f)
-								WasMinimaHook = 1;
-
-							if(WasMinimaHook && SumHook > 0.6f && SumHook > SumBestHook)
-							{
-								SumBestHook = SumHook;
-								LenHook = LenCur;
-								//LenMaxHook = minimum(LenMaxHook, (int) (LenCur * 1.5));
-							}
-						}
-					}
-
-					if(LenDir < 0 || SumBestDir < 0.1f)
-						LenDir = LenMax;
-					else
-					{
-						if(absolute(m_aClients[i].m_PredDirLen - (float) LenDir) < 5.f)
-							m_aClients[i].m_PredDirLen = m_aClients[i].m_PredDirLen + clamp((float)LenDir - m_aClients[i].m_PredDirLen, -0.25f, 0.25f);
 						else
-							m_aClients[i].m_PredDirLen = LenDir;
-						m_aClients[i].m_PredDirLen = clamp(m_aClients[i].m_PredDirLen, 4.f, 50.f);
-						LenDir = round_to_int(m_aClients[i].m_PredDirLen);
-
-						int L = minimum(LenDir + 10, LenMax);
-						L = maximum(L, 60);
-						unsigned char aBuf0[L+1] = {0};
-						unsigned char aBuf1[L+1] = {0};
-						for(int k = 0; k < L; k++)
 						{
-							int Cur = (Client()->GameTick(g_Config.m_ClDummy) - k) % NumInputs;
-							int Prev = (Client()->GameTick(g_Config.m_ClDummy) - k - LenDir) % NumInputs;
-							if(Cur >= 0 && Prev >= 0)
-							{
-								int DirCur = m_aClients[i].m_SnapInput[Cur].m_Direction;
-								int DirPrev = m_aClients[i].m_SnapInput[Prev].m_Direction;
-								aBuf0[k] = DirCur > 0 ? 'x' : DirCur < 0 ? '|' : '_';
-								aBuf1[k] = DirPrev > 0 ? 'x' : DirPrev < 0 ? '|' : '_';
-							}
-							else
-							{
-								aBuf0[k] = '#';
-								aBuf1[k] = '#';
-							}
+							SumDir = -1.f;
+							SumHook = -1.f;
+							break;
 						}
-						aBuf0[L+1] = '\0';
-						aBuf1[L+1] = '\0';
-						dbg_msg("","%s", aBuf0);
-						dbg_msg("","%s", aBuf1);
-						dbg_msg("","Len: %3d, MaxCur: %3d, Max: %3d    (match: %4.2f)", LenDir, LenMaxDir, LenMax, SumBestDir);
 					}
-					for(int Tick = Client()->GameTick(g_Config.m_ClDummy) + 1; Tick <= Client()->PredGameTick(g_Config.m_ClDummy); Tick++)
+					float LOW = 0.6;
+					float HIGH = 0.85;
+					if(LenCur <= LenMaxDir && !FoundDir)
 					{
-						int PredIdx = Tick % NumInputs;
-						int SnapTick = minimum(Client()->GameTick(g_Config.m_ClDummy) - LenDir + (Tick - 1 - Client()->GameTick(g_Config.m_ClDummy)) % LenDir, Client()->GameTick(g_Config.m_ClDummy)); // -1
-						int SnapIdx = SnapTick % NumInputs;
-						if(PredIdx >= 0 && SnapIdx >= 0)
-							m_aClients[i].m_PredInput[PredIdx].m_Direction = m_aClients[i].m_SnapInput[SnapIdx].m_Direction;
-					}
+						SumDir = SumDir / (SumWeight + 0.01f);
+						if(SumDir < LOW)
+							WasMinimaDir = 1;
 
-					if(LenHook < 0 || SumBestHook < 0.1f)
-						LenHook = LenMax;
+						if(WasMinimaDir && SumDir > HIGH && SumDir > SumBestDir)
+						{
+							SumBestDir = SumDir;
+							LenDir = LenCur;
+							WasMaximaDir = 1;
+							LenMaxDir = minimum(LenMaxDir, (int) (LenCur * 1.7f));
+						}
+						if(WasMaximaDir && SumDir < minimum(LOW, SumBestDir * 0.8f))
+							FoundDir = 1;
+					}
+					if(LenCur <= LenMaxHook && !FoundHook)
+					{
+						SumHook = SumHook / (SumWeight + 0.01f);
+						if(SumHook < LOW)
+							WasMinimaHook = 1;
+
+						if(WasMinimaHook && SumHook > HIGH && SumHook > SumBestHook)
+						{
+							SumBestHook = SumHook;
+							LenHook = LenCur;
+							WasMaximaHook = 1;
+							LenMaxHook = minimum(LenMaxHook, (int) (LenCur * 1.7f));
+						}
+						if(WasMaximaHook && SumHook < minimum(LOW, SumBestHook * 0.8f))
+							FoundHook = 1;
+					}
+				}
+
+				if(LenDir < 0 || SumBestDir < 0.1f || !FoundDir)
+					LenDir = 1;
+				else
+				{
+					if(absolute(m_aClients[i].m_PredDirLen - (float) LenDir) < 5.f)
+						m_aClients[i].m_PredDirLen = m_aClients[i].m_PredDirLen + clamp((float)LenDir - m_aClients[i].m_PredDirLen, -0.25f, 0.25f);
 					else
-					{
-						if(absolute(m_aClients[i].m_PredHookLen - (float) LenHook) < 5.f)
-							m_aClients[i].m_PredHookLen = m_aClients[i].m_PredHookLen + clamp((float)LenHook - m_aClients[i].m_PredHookLen, -0.25f, 0.25f);
-						else
-							m_aClients[i].m_PredHookLen = LenHook;
-						m_aClients[i].m_PredHookLen = clamp(m_aClients[i].m_PredHookLen, 4.f, 50.f);
-						LenHook = round_to_int(m_aClients[i].m_PredHookLen);
-					}
+						m_aClients[i].m_PredDirLen = LenDir;
+					//m_aClients[i].m_PredDirLen = clamp(m_aClients[i].m_PredDirLen, 4.f, 50.f);
+					LenDir = maximum(round_to_int(m_aClients[i].m_PredDirLen), 4);
 
-					for(int Tick = Client()->GameTick(g_Config.m_ClDummy) + 1; Tick <= Client()->PredGameTick(g_Config.m_ClDummy); Tick++)
+					int L = minimum(LenDir + 10, LenMax);
+					L = maximum(L, 60);
+					unsigned char aBuf[3][L+1];
+					for(int k = 0; k < L; k++)
 					{
-						int PredIdx = Tick % NumInputs;
-						int SnapTick = minimum(Client()->GameTick(g_Config.m_ClDummy) - LenHook + (Tick - Client()->GameTick(g_Config.m_ClDummy)) % LenHook, Client()->GameTick(g_Config.m_ClDummy));
-						int SnapIdx = SnapTick % NumInputs;
-						if(PredIdx >= 0 && SnapIdx >= 0)
-							m_aClients[i].m_PredInput[PredIdx].m_Hook = m_aClients[i].m_SnapInput[SnapIdx].m_Hook;
+						int Cur = (Client()->GameTick(g_Config.m_ClDummy) - k) % NumInputs;
+						int Prev = (Client()->GameTick(g_Config.m_ClDummy) - k - LenDir) % NumInputs;
+						aBuf[0][k] = ' ';
+						aBuf[1][k] = ' ';
+						aBuf[2][k] = ' ';
+						if(Cur >= 0 && Prev >= 0)
+						{
+							int DirCur = m_aClients[i].m_SnapInput[Cur].m_Direction;
+							int DirPrev = m_aClients[i].m_SnapInput[Prev].m_Direction;
+							aBuf[0][k] = DirCur > 0 ? 'x' : DirCur < 0 ? '|' : '_';
+							aBuf[1][k] = DirPrev > 0 ? 'x' : DirPrev < 0 ? '|' : '_';
+						}
 					}
+					if(L > LenDir)
+						aBuf[2][LenDir] = '^';
 
-					for(int Tick : {Client()->GameTick(g_Config.m_ClDummy) + 1, Client()->PredGameTick(g_Config.m_ClDummy)})
-					{
-						int PredIdx = Tick % NumInputs;
-						int SnapIdx = Client()->GameTick(g_Config.m_ClDummy) % NumInputs;
-						if(PredIdx >= 0 && SnapIdx >= 0)
-							m_aClients[i].m_PredInput[PredIdx].m_Direction = m_aClients[i].m_SnapInput[SnapIdx].m_Direction;
-					}
+					aBuf[0][L] = '\0';
+					aBuf[1][L] = '\0';
+					aBuf[2][L] = '\0';
+					dbg_msg("","%s", aBuf[0]);
+					dbg_msg("","%s", aBuf[1]);
+					dbg_msg("","%s", aBuf[2]);
+					dbg_msg("","Len: %3d, MaxCur: %3d, Max: %3d    (match: %4.2f)", LenDir, LenMaxDir, LenMax, SumBestDir);
+				}
+				for(int Tick = Client()->GameTick(g_Config.m_ClDummy) + 1; Tick <= Client()->PredGameTick(g_Config.m_ClDummy); Tick++)
+				{
+					int PredIdx = Tick % NumInputs;
+					int SnapTick = minimum(Client()->GameTick(g_Config.m_ClDummy) - LenDir + (Tick - 1 - Client()->GameTick(g_Config.m_ClDummy)) % LenDir, Client()->GameTick(g_Config.m_ClDummy)); // -1
+					int SnapIdx = SnapTick % NumInputs;
+					if(PredIdx >= 0 && SnapIdx >= 0)
+						m_aClients[i].m_PredInput[PredIdx].m_Direction = m_aClients[i].m_SnapInput[SnapIdx].m_Direction;
+				}
+
+				if(LenHook < 0 || SumBestHook < 0.1f || !FoundHook)
+					LenHook = LenMax;
+				else
+				{
+					if(absolute(m_aClients[i].m_PredHookLen - (float) LenHook) < 5.f)
+						m_aClients[i].m_PredHookLen = m_aClients[i].m_PredHookLen + clamp((float)LenHook - m_aClients[i].m_PredHookLen, -0.25f, 0.25f);
+					else
+						m_aClients[i].m_PredHookLen = LenHook;
+					m_aClients[i].m_PredHookLen = clamp(m_aClients[i].m_PredHookLen, 4.f, 50.f);
+					LenHook = round_to_int(m_aClients[i].m_PredHookLen);
+				}
+
+				for(int Tick = Client()->GameTick(g_Config.m_ClDummy) + 1; Tick <= Client()->PredGameTick(g_Config.m_ClDummy); Tick++)
+				{
+					int PredIdx = Tick % NumInputs;
+					int SnapTick = minimum(Client()->GameTick(g_Config.m_ClDummy) - LenHook + (Tick - Client()->GameTick(g_Config.m_ClDummy)) % LenHook, Client()->GameTick(g_Config.m_ClDummy));
+					int SnapIdx = SnapTick % NumInputs;
+					if(PredIdx >= 0 && SnapIdx >= 0)
+						m_aClients[i].m_PredInput[PredIdx].m_Hook = m_aClients[i].m_SnapInput[SnapIdx].m_Hook;
+				}
+
+				for(int Tick : {Client()->GameTick(g_Config.m_ClDummy) + 1, Client()->PredGameTick(g_Config.m_ClDummy)})
+				{
+					int PredIdx = Tick % NumInputs;
+					int SnapIdx = Client()->GameTick(g_Config.m_ClDummy) % NumInputs;
+					if(PredIdx >= 0 && SnapIdx >= 0)
+						m_aClients[i].m_PredInput[PredIdx].m_Direction = m_aClients[i].m_SnapInput[SnapIdx].m_Direction;
 				}
 			}
 		}
@@ -2566,13 +2587,21 @@ void CGameClient::UpdatePrediction()
 					int HookState = m_Snap.m_aCharacters[i].m_Cur.m_HookState;
 					m_aClients[i].m_SnapInput[t].m_Hook = HookState == HOOK_FLYING || HookState == HOOK_GRABBED;
 
-					if(m_aClients[i].m_SnapInput[t].m_Hook && m_aClients[i].m_SnapInput[t_prev].m_Hook)
+					if(m_aClients[i].m_SnapInput[t].m_Hook && !m_aClients[i].m_SnapInput[t_prev].m_Hook)
 					{
 						float Angle = m_Snap.m_aCharacters[i].m_Cur.m_Angle / 256.0f;
 						vec2 Direction = direction(Angle);
 						m_aClients[i].m_SnapInput[t].m_TargetX = round_to_int(Direction.x * 100.f);
 						m_aClients[i].m_SnapInput[t].m_TargetY = round_to_int(Direction.y * 100.f);
 						m_aClients[i].m_PredTarget = Direction;
+					}
+					vec2 HookVel = vec2(m_Snap.m_aCharacters[i].m_Cur.m_HookDx, m_Snap.m_aCharacters[i].m_Cur.m_HookDy);
+					if(m_aClients[i].m_SnapInput[t].m_Hook && length(HookVel) > 0.01f)
+					{
+						HookVel = normalize(HookVel);
+						m_aClients[i].m_SnapInput[t].m_TargetX = round_to_int(HookVel.x * 100.f);
+						m_aClients[i].m_SnapInput[t].m_TargetY = round_to_int(HookVel.y * 100.f);
+						m_aClients[i].m_PredTarget = HookVel;
 					}
 					m_aClients[i].m_PredInput[t] = m_aClients[i].m_SnapInput[t];
 				}
