@@ -1849,14 +1849,6 @@ void CGameClient::OnPredict()
 					if(PredIdx >= 0 && SnapIdx >= 0)
 						m_aClients[i].m_PredInput[PredIdx].m_Hook = m_aClients[i].m_SnapInput[SnapIdx].m_Hook;
 				}
-
-				for(int Tick : {Client()->GameTick(g_Config.m_ClDummy) + 1, Client()->PredGameTick(g_Config.m_ClDummy)})
-				{
-					int PredIdx = Tick % NumInputs;
-					int SnapIdx = Client()->GameTick(g_Config.m_ClDummy) % NumInputs;
-					if(PredIdx >= 0 && SnapIdx >= 0)
-						m_aClients[i].m_PredInput[PredIdx].m_Direction = m_aClients[i].m_SnapInput[SnapIdx].m_Direction;
-				}
 			}
 		}
 	}
